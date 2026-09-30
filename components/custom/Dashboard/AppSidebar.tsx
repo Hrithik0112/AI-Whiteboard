@@ -7,6 +7,7 @@ import { Archive, LayoutGrid, Settings, Sparkles, UserRound } from 'lucide-react
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import React from 'react'
+import CreateNewBoardDialog from './CreateNewBoardDialog'
 
 const AppSidebar = () => {
 
@@ -22,7 +23,7 @@ const AppSidebar = () => {
     </SidebarHeader>
       <SidebarContent>
         <SidebarGroup />
-            <Button>+ Create New Board</Button>
+            <CreateNewBoardDialog/>
         <SidebarGroup />
         <SidebarGroup>
             <SidebarGroupLabel>My Board</SidebarGroupLabel>
@@ -52,9 +53,7 @@ const AppSidebar = () => {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <Button>
-            + Create New Board
-        </Button>
+        <CreateNewBoardDialog/>
         <div className='p-4 my-3 border rounded-md'>
             <h2 className='text-sm flex justify-between mb-1'>2 files created</h2>
             <Progress value={66} className='h-2 mt-2' />

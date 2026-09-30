@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Provider from './Provider';
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { Toaster } from '@/components/ui/toast';
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -23,7 +24,7 @@ export default function RootLayout({
 }>) {
   if (!isClerkConfigured) {
     return (
-      <html lang="en" className={cn("font-sans", inter.variable)}>
+      <html lang="en" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
         <body style={{ margin: 0, padding: 0 }}>
           {children}
         </body>
@@ -33,11 +34,12 @@ export default function RootLayout({
 
   return (
     <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
+      <html lang="en" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
         <body style={{ margin: 0, padding: 0 }}>
           <Provider>
           {children}
           </Provider>
+          <Toaster/>
         </body>
       </html>
     </ClerkProvider>

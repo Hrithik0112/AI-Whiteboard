@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { useUser } from '@clerk/nextjs'
 import { Sparkles } from 'lucide-react'
 import React from 'react'
+import CreateNewBoardDialog from './CreateNewBoardDialog'
 
 const WelcomeBanner = () => {
     const {user} = useUser()
@@ -12,7 +13,7 @@ const WelcomeBanner = () => {
             <h2 className='text-2xl font-bold'>Welcome back, {user?.fullName}</h2>
             <p className='mt-2'>Bring your ideas to life on infinte canvas</p>
             <div className='flex items-center gap-2 mt-5'>
-                <Button size="lg">+ Create new Board</Button>
+                <CreateNewBoardDialog/>
                 <Button size="lg"> <Sparkles/> AI helper</Button>
             </div>
         </div>
