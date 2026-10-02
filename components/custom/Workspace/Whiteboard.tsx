@@ -5,10 +5,12 @@ import "@excalidraw/excalidraw/index.css";
 import axios from 'axios';
 import { useParams } from 'next/navigation';
 import { toast } from '@/components/ui/toast';
-import { ArrowRight, Circle, Diamond, Eraser, Hand, Image, Minus, MousePointer, Pencil, Square, Type } from 'lucide-react';
+import { ArrowRight, Circle, Diamond, Eraser, Hand, Image, Minus, MousePointer, Pencil, Sparkles, Square, Type } from 'lucide-react';
 import { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import './whiteboard.css'
 import FloatingProperties from './FloatingProperties';
+import AIFloatingSidebar from './AIFloatingSidebar';
+import { Button } from '@/components/ui/button';
 
 const tools = [
     {
@@ -68,7 +70,11 @@ const tools = [
     }
 ]
 
-const Whiteboard = () => {
+type Props = {
+    onApiReady: (api: ExcalidrawImperativeAPI) => void
+}
+
+const Whiteboard = ({ onApiReady }: Props) => {
 
     const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
     const { projectId } = useParams();
@@ -79,6 +85,7 @@ const Whiteboard = () => {
     const [activeTool, setActiveTool] = useState('selection');
     const [selectedElement, setSelectedElement] = useState<any>(null);
     const [canvasState, setCanvasState] = useState<any>(null);
+    const [ShowAiSidebar, setShowAiSidebar] = useState(false);
 
     const handleCanvasChange = (elements: readonly any[], appstate: any, files: any) => {
 
@@ -193,12 +200,20 @@ const Whiteboard = () => {
     const handleDuplicate = () => {
         if (!excalidrawAPI || !selectedElement) return;
         const elements = excalidrawAPI.getSceneElements();
-        const newElement = {
+        const newElement: any = {
             ...selectedElement,
             id: `${selectedElement.id}_copy_${Date.now()}`,
             x: selectedElement.x + 20,
             y: selectedElement.y + 20,
         };
+
+        // If linear element (arrow/line), deep clone points and clear bindings to prevent non-normalized state
+        if (Array.isArray(selectedElement.points)) {
+            newElement.points = selectedElement.points.map((p: any) => [...p]);
+            delete newElement.startBinding;
+            delete newElement.endBinding;
+        }
+        delete newElement.boundElements;
         excalidrawAPI.updateScene({ elements: [...elements, newElement] });
     };
 
@@ -254,6 +269,12 @@ const Whiteboard = () => {
                     ))
                 }
             </div>
+            <div className="absolute right-15  bottom-2 z-50">
+                <Button size={"lg"} onClick={() => setShowAiSidebar(!ShowAiSidebar)}>
+                    <Sparkles />AI
+                </Button>
+            </div>
+            {ShowAiSidebar && <AIFloatingSidebar onClose={() => setShowAiSidebar(false)} excalidrawAPI={excalidrawAPI} />}
         </div>
     )
 }
