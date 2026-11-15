@@ -1,11 +1,13 @@
-import { db, projects } from "@/db";
+import { db, projects , whiteboardData} from "@/db";
 import { currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
     const {projectName, projectId} = await request.json()
 
     const user = await currentUser()
+    const email = user?.primaryEmailAddress?.emailAddress || "guest@example.com";
 
     if(!projectName || !projectId) {
         return NextResponse.json({error: 'Project information missing'}, {status: 400})
@@ -14,8 +16,62 @@ export async function POST(request: NextRequest) {
     const result = await db.insert(projects).values({
         projectId,
         projectName,
-        userEmail: user?.emailAddresses[0].emailAddress ?? '',
-    }).returning()
+        userEmail: email,
+    }).onConflictDoUpdate({
+        target: projects.projectId,
+        set: {
+            projectName : projectName
+        }
+    })
+    .returning()
 
     return NextResponse.json(result[0])
+}
+
+export async function GET(req: NextRequest) {
+    const searchParams = req.nextUrl.searchParams;
+    const projectId = searchParams.get('projectId');
+
+    if (!projectId) {
+        return NextResponse.json({ error: 'Project Information Missing' }, { status: 400 });
+    }
+
+    try {
+        const projectResult = await db.select().from(projects).where(eq(projects.projectId, projectId));
+        const project = projectResult?.[0];
+        const projectName = project?.projectName || "Untitled Board";
+
+        const result = await db.select().from(whiteboardData).where(eq(whiteboardData.projectId, projectId));
+
+        if (result && result.length > 0) {
+            return NextResponse.json({
+                ...result[0],
+                projectName: projectName,
+            });
+        }
+
+        // Default initial board object matching the structure in the tutorial
+        const defaultBoard = {
+            id: 1,
+            projectId: projectId,
+            projectName: projectName,
+            elements: [],
+            appState: { name: projectName, zoom: { value: 1 } },
+            files: {},
+            updatedAt: new Date().toISOString()
+        };
+
+        return NextResponse.json(defaultBoard);
+    } catch (err: any) {
+        console.error("GET /api/projects error:", err);
+        return NextResponse.json({
+            id: 1,
+            projectId: projectId,
+            projectName: "Untitled Board",
+            elements: [],
+            appState: { name: "Untitled Board", zoom: { value: 1 } },
+            files: {},
+            updatedAt: new Date().toISOString()
+        });
+    }
 }

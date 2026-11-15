@@ -2,20 +2,33 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios';
 import { UserDetailsContext } from '@/context/UserDetailsContext';
+import { useUser } from '@clerk/nextjs';
 
 const Provider = ({children} : {children : React.ReactNode}) => {
 
     const [userDeatials, setuserDeatials] = useState(null)
 
-    useEffect(()=> {
-        CreateNewUser()
-    }, [])
+    const { user, isLoaded } = useUser();
 
     const CreateNewUser = async () => {
-        const result = await axios.post('/api/users')
-        console.log("userdata",result.data)
-        setuserDeatials(result.data)
-    }
+      try {
+        const payload = user ? {
+          name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.username || "User",
+          email: user.primaryEmailAddress?.emailAddress
+        } : {};
+        const result = await axios.post("/api/users", payload);
+        console.log(result.data);
+        setuserDeatials(result.data);
+      } catch (err: any) {
+        console.error("Error creating/fetching user:", err);
+      }
+    };
+
+    useEffect(()=>{
+        if (isLoaded) {
+          CreateNewUser();
+        }
+    }, [isLoaded, user])
   return (
     <UserDetailsContext.Provider value={{userDeatials, setuserDeatials}}>
         <div>{children}</div>
