@@ -1,18 +1,28 @@
-import { db, whiteboardData } from "@/db";
+import { db, whiteboardData, projects  } from "@/db";
 import { currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
-    const { projectId, elements, appState, files } = await req.json();
+    try {
 
-    const user = await currentUser();
+        const { projectId, elements, appState, files } = await req.json();
+        const user = await currentUser();
+        const email = user?.primaryEmailAddress?.emailAddress || "guest@example.com";
 
-    if( !user ) {
-        return NextResponse.json('Unauthorized user', { status: 401 });
-    }
+        if (!projectId) {
+            return NextResponse.json({ error: "ProjectId is required" }, { status: 400 });
+        }
 
-    if(projectId) {
-        try {
+        // Ensure project exists in projects table to satisfy foreign key constraint
+        const existingProject = await db.select().from(projects).where(eq(projects.projectId, projectId));
+        if (!existingProject || existingProject.length === 0) {
+            await db.insert(projects).values({
+                projectId: projectId,
+                projectName: "Untitled Board",
+                userEmail: email
+            });
+        }
         const result = await db.insert(whiteboardData).values({
             projectId,
             elements,
@@ -29,10 +39,9 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json(result);
-    } catch (error) {
-        return NextResponse.json('Error saving whiteboard changes', { status: 500 });
-    }       
-}
+    } catch (error: any) {
+        console.error("Whiteboard save error:", error);
+        return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
+    }
+}       
 
-    return NextResponse.json('Project information is missing', { status: 400 });
-}   

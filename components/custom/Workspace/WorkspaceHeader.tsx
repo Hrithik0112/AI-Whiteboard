@@ -7,15 +7,18 @@ import { DownloadIcon, Save, Share } from 'lucide-react'
 
 type WorkspaceHeaderProps = {
   selectedTab: any;
+  projectName?: string;
   onExport?: () => void;
 };
 
-const WorkspaceHeader = ({ selectedTab, onExport }: WorkspaceHeaderProps) => {
+const WorkspaceHeader = ({ selectedTab, projectName, onExport }: WorkspaceHeaderProps) => {
   return (
     <div className='p-3 border-b flex justify-between'>
       <div className='flex gap-2 items-center'>
         <Image src={'/logo.svg'} alt="Logo" width={35} height={35} />
-        <h2>Workspace Name</h2>
+        <h2 className='font-semibold text-base md:text-lg text-slate-800 dark:text-slate-100 truncate max-w-[200px] sm:max-w-xs md:max-w-md'>
+          {projectName || "Workspace Name"}
+        </h2>
       </div>
       {/* switch */}
       <div>
