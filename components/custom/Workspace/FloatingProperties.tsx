@@ -788,7 +788,7 @@ function FloatingProperties({
           "
                 >
                     <div className="flex h-9 items-center justify-between px-2.5">
-                        <span className="text-[13px] font-semibold text-slate-900">
+                        <span className="text-[15px] font-semibold text-slate-900">
                             {getMoreTitle()}
                         </span>
 
@@ -1124,7 +1124,7 @@ function ShapeOptions({
                 <div className="flex items-center justify-between">
                     <PropertyLabel>Stroke</PropertyLabel>
 
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-[12px] text-slate-400">
                         Style & width
                     </span>
                 </div>
@@ -1503,7 +1503,7 @@ function OpacityControl({
             <div className="flex items-center justify-between">
                 <PropertyLabel>Opacity</PropertyLabel>
 
-                <span className="text-[10px] font-medium text-slate-400">
+                <span className="text-[12px] font-medium text-slate-400">
                     {selectedElement.opacity ?? 100}%
                 </span>
             </div>
@@ -1626,7 +1626,7 @@ function QuickAction({
         border
         border-slate-200
         px-2
-        text-[10px]
+        text-[12px]
         font-medium
         text-slate-600
         transition
@@ -1668,7 +1668,7 @@ function TextOptionButton({
         justify-center
         rounded-lg
         border
-        text-[11px]
+        text-[13px]
         font-medium
         transition
         ${active
@@ -1936,7 +1936,7 @@ function PropertyLabel({
     return (
         <span
             className="
-        text-[11px]
+        text-[13px]
         font-semibold
         text-slate-500
       "

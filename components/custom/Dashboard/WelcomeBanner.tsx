@@ -1,24 +1,8 @@
-"use client"
-import { Button } from '@/components/ui/button'
-import { useUser } from '@clerk/nextjs'
-import { Sparkles } from 'lucide-react'
-import React from 'react'
-import CreateNewBoardDialog from './CreateNewBoardDialog'
+'use client';
+import { useUser } from '@clerk/nextjs';
+import CreateNewBoardDialog from './CreateNewBoardDialog';
 
-const WelcomeBanner = () => {
-    const {user} = useUser()
-  return (
-    <div>
-        <div className='p-10 border rounded-xl bg-gradient-to-r from-blue-200 to-purple-300'>
-            <h2 className='text-2xl font-bold'>Welcome back, {user?.fullName}</h2>
-            <p className='mt-2'>Bring your ideas to life on infinte canvas</p>
-            <div className='flex items-center gap-2 mt-5'>
-                <CreateNewBoardDialog/>
-                <Button size="lg"> <Sparkles/> AI helper</Button>
-            </div>
-        </div>
-    </div>
-  )
+export default function WelcomeBanner() {
+  const { user } = useUser();
+  return <section className="db-welcome"><div><span className="db-eyebrow">YOUR CREATIVE SPACE</span><h1>Welcome back{user?.firstName ? `, ${user.firstName}` : ''}.</h1><p>Pick up a thought, or make room for a new one.</p></div><CreateNewBoardDialog /></section>;
 }
-
-export default WelcomeBanner

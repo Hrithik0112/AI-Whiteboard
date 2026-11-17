@@ -223,7 +223,7 @@ function FloatingActionBar({
                       }}
                     >
                       <div
-                        className="mb-2 inline-flex rounded-full px-2 py-1 text-[10px] font-semibold"
+                        className="mb-2 inline-flex rounded-full px-2 py-1 text-[12px] font-semibold"
                         style={{
                           backgroundColor: template.tagBg,
                           color: template.textColor,
@@ -342,7 +342,7 @@ function FloatingActionBar({
                             />
                           </div>
 
-                          <span className="max-w-full truncate text-[11px] font-medium text-gray-600">
+                          <span className="max-w-full truncate text-[13px] font-medium text-gray-600">
                             {icon.label}
                           </span>
                         </button>

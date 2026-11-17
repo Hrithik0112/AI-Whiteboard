@@ -75,7 +75,7 @@
   border: none;
   background: transparent;
   color: #374151;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.18s ease;
@@ -135,7 +135,7 @@
   margin: 0;
 }
 .panel-subtitle {
-  font-size: 12px;
+  font-size: 14px;
   color: #6b7280;
   margin: 2px 0 0;
 }
@@ -193,7 +193,7 @@
   gap: 5px;
 }
 .note-badge {
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 999px;
@@ -214,13 +214,13 @@
 
 .note-info { flex: 1; }
 .note-name {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: #111827;
   margin: 0;
 }
 .note-desc {
-  font-size: 11px;
+  font-size: 13px;
   color: #6b7280;
   margin: 1px 0 0;
 }
@@ -244,7 +244,7 @@
   padding: 7px 0;
   border: none;
   background: none;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   color: #6b7280;
   cursor: pointer;
@@ -273,7 +273,7 @@
   padding: 8px 12px 8px 32px;
   border: 1.5px solid #e5e7eb;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 15px;
   color: #111827;
   background: #f9fafb;
   outline: none;
@@ -313,7 +313,7 @@
 }
 
 .emoji-section-label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: #9ca3af;
   text-transform: uppercase;
@@ -384,7 +384,7 @@
   line-height: 1;
 }
 .icon-label {
-  font-size: 9px;
+  font-size: 12px;
   color: #6b7280;
   text-align: center;
   line-height: 1.2;

@@ -557,7 +557,7 @@ return {
                     bg-green-50
                     px-2
                     py-0.5
-                    text-[9px]
+                    text-[12px]
                     font-semibold
                     uppercase
                     tracking-wide
@@ -612,7 +612,7 @@ return {
             What do you want to create?
           </h3>
 
-          <span className="text-[10px] text-gray-400">
+          <span className="text-[12px] text-gray-400">
             {AiTools.length} tools
           </span>
         </div>
@@ -672,7 +672,7 @@ return {
                   <p
                     className="
                       truncate
-                      text-[11px]
+                      text-[13px]
                       font-semibold
                       text-gray-900
                     "
@@ -684,7 +684,7 @@ return {
                     className="
                       mt-0.5
                       truncate
-                      text-[9px]
+                      text-[12px]
                       text-gray-400
                     "
                   >
@@ -732,7 +732,7 @@ return {
               <label className="text-xs font-semibold text-gray-800">
                 Describe your idea
               </label>
-              <p className="text-[10px] text-gray-400 mt-0.5">
+              <p className="text-[12px] text-gray-400 mt-0.5">
                 AI will generate it directly on your canvas
               </p>
             </div>
@@ -775,7 +775,7 @@ return {
             "
           >
             {/* Selected Tool Badge */}
-            <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+            <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[12px] font-medium text-gray-600">
               {selectedTool}
             </span>
 
@@ -790,7 +790,7 @@ return {
                 from-blue-600
                 to-violet-600
                 px-3.5
-                text-[11px]
+                text-[13px]
                 font-semibold
                 text-white
                 shadow-md
@@ -817,7 +817,7 @@ return {
           className="
             mt-2
             text-center
-            text-[9px]
+            text-[12px]
             text-gray-400
           "
         >

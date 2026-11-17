@@ -1,42 +1,22 @@
-import { db, users } from "@/db";
-import { currentUser } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
-import { NextRequest, NextResponse } from "next/server";
+import { db, users } from '@/db';
+import { currentUser } from '@clerk/nextjs/server';
+import { eq } from 'drizzle-orm';
+import { NextResponse } from 'next/server';
+import { getBoardUsage } from '@/lib/server-board-usage';
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
-    const body = await req.json().catch(() => ({}));
-    const clerkUser = await currentUser();
-
-    const email =
-      clerkUser?.primaryEmailAddress?.emailAddress ||
-      body?.email ||
-      "guest@example.com";
-
-    const name = clerkUser
-      ? `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || clerkUser.username || "User"
-      : body?.name || "Guest User";
-
-    // Check if user already exists in DB
-    const existingUser = await db.select().from(users).where(eq(users.email, email));
-
-    if (existingUser && existingUser.length > 0) {
-      return NextResponse.json(existingUser[0]);
-    }
-
-    // Insert new user record
-    const newUser = await db
-      .insert(users)
-      .values({
-        name: name,
-        email: email,
-        credits: 3,
-      })
-      .returning();
-
-    return NextResponse.json(newUser[0]);
-  } catch (error: any) {
-    console.error("Error creating/fetching user:", error);
-    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
+    const user = await currentUser();
+    const email = user?.primaryEmailAddress?.emailAddress;
+    if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'User';
+    await db.insert(users).values({ name, email }).onConflictDoNothing({ target: users.email });
+    const [record] = await db.select().from(users).where(eq(users.email, email));
+    // Stored credits may have drifted in older versions. Active boards are the
+    // source of truth; archived boards never consume a slot.
+    return NextResponse.json({ ...record, ...await getBoardUsage(email) });
+  } catch (error) {
+    console.error('Failed to load user details:', error);
+    return NextResponse.json({ error: 'Failed to load user details' }, { status: 500 });
   }
 }
