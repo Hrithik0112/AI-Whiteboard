@@ -152,6 +152,53 @@ public/                 Static assets
 utils/                  Excalidraw persistence and preview helpers
 ```
 
+## High-level architecture
+
+```mermaid
+flowchart LR
+    User[User] --> Browser[Next.js browser application]
+
+    subgraph Client[Client]
+        Landing[Landing page]
+        Dashboard[Dashboard]
+        Canvas[Excalidraw workspace]
+        Appearance[Appearance context]
+    end
+
+    Browser --> Landing
+    Browser --> Dashboard
+    Browser --> Canvas
+    Appearance --> Storage[(Browser localStorage)]
+
+    Dashboard --> Middleware[Clerk middleware]
+    Canvas --> Middleware
+    Middleware --> Clerk[Clerk authentication]
+    Middleware --> API[Next.js API routes]
+
+    subgraph Server[Server]
+        API
+        Projects[Project and archive service]
+        Whiteboards[Whiteboard save service]
+        Usage[Board and AI usage limits]
+        AI[AI generation service]
+        Drizzle[Drizzle ORM]
+    end
+
+    API --> Projects
+    API --> Whiteboards
+    API --> Usage
+    API --> AI
+    Projects --> Drizzle
+    Whiteboards --> Drizzle
+    Usage --> Drizzle
+    Drizzle --> Neon[(Neon Postgres)]
+    AI --> Gemini[Google Gemini API]
+    AI --> Usage
+    AI --> Canvas
+```
+
+The browser owns the interactive canvas and converts Gemini's structured response into Excalidraw elements. Next.js API routes verify the Clerk session before reading or writing board data. Drizzle handles database access, while appearance preferences remain on the user's device.
+
 ## API routes
 
 All board and workspace routes require a Clerk session. Board queries are scoped to the signed-in user's primary email address; AI usage is keyed by the Clerk user ID.
