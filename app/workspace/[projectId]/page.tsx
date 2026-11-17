@@ -1,12 +1,14 @@
 "use client"
-import { normalizeAppState } from '@/app/utils/helper';
+import { generatePreviewBase64, normalizeAppState } from '@/utils/helper';
 import Doc from '@/components/custom/Workspace/Doc';
 import Whiteboard from '@/components/custom/Workspace/Whiteboard';
 import WorkspaceHeader from '@/components/custom/Workspace/WorkspaceHeader'
 import { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import axios from 'axios';
 import { useParams } from 'next/navigation';
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { is } from 'drizzle-orm';
+import { toast } from '@/components/ui/toast';
 
 const WorkspacePage = () => {
 
@@ -14,20 +16,28 @@ const WorkspacePage = () => {
     const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
     const [projectName, setProjectName] = useState<string>("");
   const [boardData, setBoardData] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const isSceneLoadedRef = useRef(false);
 
   const params = useParams();
   // Folder is [projectid] (lowercase), so useParams gives { projectid: '...' }
   const projectId = (params?.projectid || params?.projectId) as string;
 
+  const handleApiReady = useCallback((newApi: ExcalidrawImperativeAPI) => {
+    setApi(newApi);
+  }, []);
+
   useEffect(() => {
     if (projectId) {
-      GetWhiteboardData();
+        isSceneLoadedRef.current = false;
+        GetWhiteboardData();
     }
   }, [projectId]);
 
   useEffect(() => {
-    if (boardData && api) {
-      api.updateScene({
+    if (boardData && api && !isSceneLoadedRef.current) {
+        isSceneLoadedRef.current = true;
+        api.updateScene({
         elements: boardData.elements || [],
         appState: normalizeAppState(boardData.appState),
       });
@@ -36,6 +46,40 @@ const WorkspacePage = () => {
       }
     }
   }, [boardData, api]);
+
+  const handleSaveCanvas = async () => {
+    if (!api || !projectId) return;
+    setSaving(true);
+    try {
+      const elements = api.getSceneElements();
+      const appState = api.getAppState();
+      const files = api.getFiles();
+
+      const previewBase64 = await generatePreviewBase64(api);
+
+      const updatedAppState = {
+        ...appState,
+        ...(previewBase64 ? { image: previewBase64 } : {}),
+      };
+
+      const result = await axios.post("/api/whiteboard", {
+        projectId,
+        elements,
+        appState: updatedAppState,
+        files,
+        image: previewBase64,
+      });
+
+      if (result.status === 200) {
+        toast.add({ title: "Canvas Saved", type: "success" });
+      }
+    } catch (err: any) {
+      console.error("Failed to save whiteboard:", err);
+      toast.add({ title: "Failed to save whiteboard", type: "error" });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const GetWhiteboardData = async () => {
     if (!projectId) return;
@@ -77,17 +121,15 @@ const WorkspacePage = () => {
             <WorkspaceHeader 
             projectName={projectName}
             selectedTab={(value: string) => setActiveTab(value)}
-                onExport={() => handleExportImage()} />
-            {activeTab === 'whiteboard' ? (
-                <Whiteboard
-                    onApiReady={(api) => {
-                        setApi(api);
-
-                    }}
-                />
-            ) : (
-                <Doc />
-            )}
+            onExport={() => handleExportImage()} 
+            onSave={handleSaveCanvas}
+            saving={saving}
+            />
+            {activeTab == "whiteboard" ? (
+        <Whiteboard onApiReady={handleApiReady} />
+      ) : (
+        <Doc />
+      )}
         </div>
     )
 }

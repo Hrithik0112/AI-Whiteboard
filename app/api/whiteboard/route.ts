@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 export async function POST(req: NextRequest) {
     try {
 
-        const { projectId, elements, appState, files } = await req.json();
+        const { projectId, elements, appState, files, image } = await req.json();
         const user = await currentUser();
         const email = user?.primaryEmailAddress?.emailAddress || "guest@example.com";
 
@@ -27,13 +27,15 @@ export async function POST(req: NextRequest) {
             projectId,
             elements,
             appState,
-            files
+            files,
+            image: image,
         }).onConflictDoUpdate({
             target: whiteboardData.projectId,
             set: {
                 elements,
                 appState,
                 files,
+                image: image,
                 updatedAt: new Date()
             }
         });
