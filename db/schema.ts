@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, date, integer, primaryKey, jsonb, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -30,3 +30,9 @@ export const whiteboardData = pgTable("whiteboardData", {
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+
+export const aiDailyUsage = pgTable('ai_daily_usage', {
+  userId: text('user_id').notNull(),
+  day: date('day').notNull(),
+  requests: integer('requests').notNull().default(0),
+}, table => [primaryKey({ columns: [table.userId, table.day] })]);

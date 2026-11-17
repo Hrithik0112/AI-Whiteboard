@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   PencilRuler,
   Sparkles,
@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { toast } from "@/components/ui/toast";
+import { AI_DAILY_LIMIT } from "@/lib/ai-limits";
 import axios from "axios";
 
 const AiTools = [
@@ -88,12 +89,13 @@ const AI_PLACEHOLDER_IDS={
 
 function AIFloatingSidebar({ onClose, excalidrawAPI }: Props) {
   const [selectedTool, setSelectedTool] = useState("Generate Diagrams");
-  const AI_PLACEHOLDER_ID='ai-placeholder';
-  const [selectedType,setSelectedType]=useState(AiTools[0]);
   const[userInput,setUserInput]=useState('');
   const [Loading,setLoading]=useState(false);
-  // Stores actual IDs of placeholder elements (convertToExcalidrawElements generates its own IDs)
-  const placeholderIdsRef = useRef<string[]>([]);
+  const requestInFlightRef = useRef(false);
+  const requestControllerRef = useRef<AbortController | null>(null);
+  const generationOriginRef = useRef({ x: 100, y: 100 });
+
+  useEffect(() => () => requestControllerRef.current?.abort(), []);
 
   const activeTool = AiTools.find((t) => t.name === selectedTool)!;
 
@@ -117,12 +119,11 @@ return {
 
   }
 
-  const addAiPlaceholder = async () => {
+  const addAiPlaceholder = async (position: { x: number; y: number }) => {
     if (!excalidrawAPI) return;
     // Clear any existing placeholder first (prevents duplicates)
     removeAiPlaceholder();
     const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
-    const position = getEmptyCanvasPosition();
     const placeholderElements = convertToExcalidrawElements([
       {
         type: "rectangle",
@@ -131,9 +132,9 @@ return {
         y: position.y,
         width: 420,
         height: 250,
-        backgroundColor: "#f5f3ff",
-        strokeColor: "#8b5cf6",
-        strokeWidth: 2,
+        backgroundColor: "#f8fafc",
+        strokeColor: "#cbd5e1",
+        strokeWidth: 1,
         roughness: 0,
         fillStyle: "solid",
         roundness: { type: 3 },
@@ -143,9 +144,9 @@ return {
         id: AI_PLACEHOLDER_IDS.title,
         x: position.x + 28,
         y: position.y + 28,
-        text: "✨ Generating with AI",
-        fontSize: 22,
-        strokeColor: "#6d28d9",
+        text: "Generating diagram",
+        fontSize: 20,
+        strokeColor: "#0f172a",
       },
       {
         type: "text",
@@ -164,8 +165,8 @@ return {
         y: position.y + 108,
         width: 200,
         height: 12,
-        backgroundColor: "#ddd6fe",
-        strokeColor: "#ddd6fe",
+        backgroundColor: "#e2e8f0",
+        strokeColor: "#e2e8f0",
         strokeWidth: 0,
         roughness: 0,
         fillStyle: "solid",
@@ -179,8 +180,8 @@ return {
         y: position.y + 132,
         width: 250,
         height: 12,
-        backgroundColor: "#ddd6fe",
-        strokeColor: "#ddd6fe",
+        backgroundColor: "#e2e8f0",
+        strokeColor: "#e2e8f0",
         strokeWidth: 0,
         roughness: 0,
         fillStyle: "solid",
@@ -194,15 +195,14 @@ return {
         y: position.y + 156,
         width: 130,
         height: 12,
-        backgroundColor: "#ddd6fe",
-        strokeColor: "#ddd6fe",
+        backgroundColor: "#e2e8f0",
+        strokeColor: "#e2e8f0",
         strokeWidth: 0,
         roughness: 0,
         fillStyle: "solid",
         roundness: { type: 3 },
       },
     ], { regenerateIds: false });
-    placeholderIdsRef.current = Object.values(AI_PLACEHOLDER_IDS);
     const currentElements = excalidrawAPI.getSceneElements();
     excalidrawAPI.updateScene({
       elements: [...currentElements, ...placeholderElements],
@@ -215,7 +215,6 @@ return {
     const elements = excalidrawAPI.getSceneElements();
     const updatedElements = elements.filter(el => !placeholderIds.has(el.id));
     excalidrawAPI.updateScene({ elements: updatedElements });
-    placeholderIdsRef.current = [];
   };
 
   const getSafeText = (val: any): string => {
@@ -285,24 +284,47 @@ return {
   };
 
   const renderAIDiagram = async (diagram: any) => {
-    if (!excalidrawAPI) return;
+    if (!excalidrawAPI) throw new Error("Canvas is not ready yet.");
 
     const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
-    const origin = getEmptyCanvasPosition();
+    const origin = generationOriginRef.current;
 
     const rawElements = diagram?.elements || [];
-    const rawConnections = diagram?.connections || rawElements.filter((el: any) => el.type === "arrow" || el.fromId || el.from);
+    const suppliedConnections = Array.isArray(diagram?.connections) ? diagram.connections : [];
+    const rawConnections = suppliedConnections.length
+      ? suppliedConnections
+      : rawElements.filter((el: any) => el.type === "arrow" || el.fromId || el.from);
     const shapesOnly = rawElements.filter((el: any) => el.type !== "arrow" && !el.fromId && !el.from);
+    if (!shapesOnly.length) throw new Error("AI did not return any usable shapes.");
 
-    if (!shapesOnly.length) return;
+    const generationId = `ai-${Date.now()}`;
+    const supportedTypes = new Set(["rectangle", "ellipse", "diamond", "text"]);
+    const typeAliases: Record<string, string> = {
+      box: "rectangle",
+      process: "rectangle",
+      circle: "ellipse",
+      decision: "diamond",
+    };
+    const nodes = new Map<string, any>();
 
+    shapesOnly.forEach((element: any, index: number) => {
+      const rawId = String(element?.id || `node-${index}`);
+      const type = typeAliases[element?.type] || element?.type;
+      if (!supportedTypes.has(type) || nodes.has(rawId)) {
+        return;
+      }
+      nodes.set(rawId, {
+        ...element,
+        id: `${generationId}-node-${index}`,
+        type,
+      });
+    });
     const getNode = (id: string) => {
-      return shapesOnly.find((element: any) => element.id === id);
+      return nodes.get(String(id));
     };
 
     // CREATE SHAPES
-    const shapeElements = shapesOnly.flatMap((element: any) => {
-      if (!element?.type || !element?.id) return [];
+    const shapeElements = Array.from(nodes.values()).flatMap<any>((element: any) => {
 
       const x = origin.x + (Number(element.x) || 0);
       const y = origin.y + (Number(element.y) || 0);
@@ -353,7 +375,6 @@ return {
         }
       ];
     });
-
     // CREATE CONNECTIONS
     const connectionElements = rawConnections
       .map((connection: any, index: number) => {
@@ -364,7 +385,6 @@ return {
         const toNode = getNode(toId);
 
         if (!fromNode || !toNode) {
-          console.warn("Unable to create connection", connection);
           return null;
         }
 
@@ -374,7 +394,7 @@ return {
           origin
         );
 
-        let deltaX = endX - startX;
+        const deltaX = endX - startX;
         let deltaY = endY - startY;
 
         if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) {
@@ -382,13 +402,13 @@ return {
         }
 
         return {
-          id: connection.id || `connection-${index}`,
+          id: `${generationId}-connection-${index}`,
           type: "arrow",
           x: startX,
           y: startY,
           points: [[0, 0], [deltaX, deltaY]],
-          start: { id: fromId },
-          end: { id: toId },
+          start: { id: fromNode.id },
+          end: { id: toNode.id },
           strokeColor: connection.strokeColor || "#475569",
           strokeWidth: Number(connection.strokeWidth) || 2,
           strokeStyle: connection.strokeStyle || "solid",
@@ -396,67 +416,94 @@ return {
           opacity: connection.opacity ?? 100,
           startArrowhead: null,
           endArrowhead: connection.endArrowhead || "arrow",
-          ...(connection.label && {
+          ...((connection.label || connection.text) && {
             label: {
-              text: getSafeText(connection.label),
+              text: getSafeText(connection.label || connection.text),
               fontSize: Number(connection.fontSize) || 16
             }
           })
         };
       })
       .filter(Boolean);
-
     const elementsToConvert = [...shapeElements, ...connectionElements];
 
     const newElements = convertToExcalidrawElements(
       elementsToConvert as any,
       { regenerateIds: false }
     );
-
-    removeAiPlaceholder();
+    if (!newElements.length) throw new Error("AI did not return a usable diagram.");
 
     const placeholderIds = new Set(Object.values(AI_PLACEHOLDER_IDS));
     const currentElements = excalidrawAPI.getSceneElements().filter(
       (e: any) => !e.isDeleted && !placeholderIds.has(e.id)
     );
-
     excalidrawAPI.updateScene({
       elements: [...currentElements, ...newElements]
     });
+    setTimeout(() => {
+      excalidrawAPI.scrollToContent(newElements, {
+        fitToViewport: true,
+        viewportZoomFactor: 0.75,
+        animate: true,
+      });
+    }, 0);
   };
 
   const OnClickGenerate = async () => {
-    if (!userInput.trim()) return;
+    const prompt = userInput.trim();
+    if (!prompt || !excalidrawAPI || requestInFlightRef.current) return;
+
+    const requestId = crypto.randomUUID();
+
+    requestInFlightRef.current = true;
     setLoading(true);
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+    generationOriginRef.current = getEmptyCanvasPosition();
 
-    await addAiPlaceholder();
-
-    const currentAiTool = AiTools.find(tool => tool.name == selectedTool);
     try {
+      await addAiPlaceholder(generationOriginRef.current);
       const result = await axios.post('/api/ai', {
-        userInput: userInput,
-        type: currentAiTool?.name,
-        systemPrompt: currentAiTool?.prompt,
+        userInput: prompt,
+        type: selectedTool,
+      }, {
+        signal: controller.signal,
+        timeout: 65_000,
+        headers: { "x-ai-request-id": requestId },
       });
-      console.log("AI API response:", result.data);
 
       const { diagramResult } = result.data;
-      if (diagramResult && excalidrawAPI) {
-        await renderAIDiagram(diagramResult);
-      } else {
-        removeAiPlaceholder();
-      }
+      if (!diagramResult) throw new Error("AI returned an empty diagram.");
+      await renderAIDiagram(diagramResult);
+      setUserInput('');
+      toast.add({ type: 'success', title: 'Diagram added to canvas' });
     } catch (error: any) {
-      console.error('AI generation failed:', error);
-      removeAiPlaceholder();
+      if (axios.isCancel(error)) return;
       let msg = error?.response?.data?.error ?? error?.message ?? 'Unknown error';
+      if (error?.code === 'ECONNABORTED') msg = 'Generation took too long. Please try a shorter prompt.';
       if (typeof msg === 'object') {
         msg = msg.message || JSON.stringify(msg);
       }
-      toast.add({ type: 'error', title: 'AI Generation Failed', description: String(msg) });
+      const temporarilyUnavailable = error?.response?.status === 503 && error?.response?.data?.quotaReduced === false;
+      toast.add({
+        type: 'error',
+        title: temporarilyUnavailable ? 'AI is temporarily busy' : 'AI Generation Failed',
+        description: String(msg),
+      });
     } finally {
+      removeAiPlaceholder();
+      requestControllerRef.current = null;
+      requestInFlightRef.current = false;
       setLoading(false);
     }
+  };
+
+  const handleClose = () => {
+    requestControllerRef.current?.abort();
+    removeAiPlaceholder();
+    requestInFlightRef.current = false;
+    setLoading(false);
+    onClose();
   };
     
   return (
@@ -472,14 +519,12 @@ return {
         border
         border-gray-200
         bg-white
-        shadow-[0_20px_60px_-15px_rgba(0,0,0,0.22)]
+        shadow-[0_14px_38px_-18px_rgba(15,23,42,0.28)]
       "
     >
       {/* ================= HEADER ================= */}
       <div
         className="
-          relative
-          overflow-hidden
           border-b
           border-gray-100
           px-5
@@ -487,36 +532,7 @@ return {
           pb-4
         "
       >
-        {/* Decorative background glow */}
-        <div
-          className="
-            pointer-events-none
-            absolute
-            -right-10
-            -top-10
-            h-32
-            w-32
-            rounded-full
-            bg-blue-100/50
-            blur-3xl
-          "
-        />
-
-        <div
-          className="
-            pointer-events-none
-            absolute
-            -left-10
-            top-10
-            h-24
-            w-24
-            rounded-full
-            bg-violet-100/40
-            blur-3xl
-          "
-        />
-
-        <div className="relative flex items-start justify-between">
+        <div className="flex items-start justify-between">
           {/* AI Icon + Title */}
           <div className="flex items-center gap-3">
             <div
@@ -527,12 +543,8 @@ return {
                 items-center
                 justify-center
                 rounded-xl
-                bg-gradient-to-br
-                from-blue-600
-                to-violet-600
+                bg-slate-900
                 text-white
-                shadow-lg
-                shadow-blue-500/20
               "
             >
               <Sparkles size={19} />
@@ -554,17 +566,17 @@ return {
                 <span
                   className="
                     rounded-full
-                    bg-green-50
+                    bg-slate-100
                     px-2
                     py-0.5
                     text-[12px]
                     font-semibold
                     uppercase
                     tracking-wide
-                    text-green-600
+                    text-slate-500
                   "
                 >
-                  AI
+                  Beta
                 </span>
               </div>
 
@@ -577,7 +589,7 @@ return {
           {/* Close Button */}
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="
               flex
               h-8
@@ -642,7 +654,7 @@ return {
 
                   ${
                     isSelected
-                      ? `${tool.activeBorder} bg-gray-50 shadow-sm`
+                      ? "border-slate-300 bg-slate-50"
                       : "border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50"
                   }
                 `}
@@ -659,9 +671,6 @@ return {
                     rounded-lg
                     ${tool.bgColor}
                     ${tool.color}
-                    transition-transform
-                    duration-200
-                    group-hover:scale-105
                   `}
                 >
                   <Icon size={17} strokeWidth={2} />
@@ -700,7 +709,7 @@ return {
                       w-1.5
                       shrink-0
                       rounded-full
-                      bg-blue-600
+                      bg-slate-700
                     "
                   />
                 )}
@@ -720,10 +729,10 @@ return {
             bg-gray-50/70
             p-3
             transition
-            focus-within:border-blue-300
+            focus-within:border-slate-400
             focus-within:bg-white
-            focus-within:ring-4
-            focus-within:ring-blue-50
+            focus-within:ring-2
+            focus-within:ring-slate-100
           "
         >
           {/* Prompt Header */}
@@ -739,7 +748,7 @@ return {
 
             <Sparkles
               size={14}
-              className="text-blue-500 shrink-0"
+              className="shrink-0 text-slate-400"
             />
           </div>
 
@@ -786,28 +795,23 @@ return {
                 h-8
                 gap-1.5
                 rounded-lg
-                bg-gradient-to-r
-                from-blue-600
-                to-violet-600
+                bg-slate-900
                 px-3.5
                 text-[13px]
                 font-semibold
                 text-white
-                shadow-md
-                shadow-blue-500/20
-                transition-all
-                hover:from-blue-700
-                hover:to-violet-700
-                hover:shadow-lg
+                shadow-sm
+                transition-colors
+                hover:bg-slate-800
               "
               onClick={OnClickGenerate}
               disabled={Loading}
             >
-              <Sparkles size={13} />
-
-              {Loading && <Loader2Icon className="animate-spin"/>}Generate
-
-              <ArrowUp size={13} />
+              {Loading ? (
+                <><Loader2Icon className="animate-spin" />Generating…</>
+              ) : (
+                <><Sparkles size={13} />Generate<ArrowUp size={13} /></>
+              )}
             </Button>
           </div>
         </div>
@@ -821,7 +825,7 @@ return {
             text-gray-400
           "
         >
-          AI generated content can be edited afterwards
+          {AI_DAILY_LIMIT} generations per day · Resets at midnight UTC
         </p>
       </div>
     </div>

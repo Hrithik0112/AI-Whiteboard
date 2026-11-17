@@ -1,49 +1,47 @@
-import { db, whiteboardData, projects  } from "@/db";
-import { currentUser } from "@clerk/nextjs/server";
-import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { db, projects, whiteboardData } from '@/db';
+import { currentUser } from '@clerk/nextjs/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { and, eq } from 'drizzle-orm';
 
 export async function POST(req: NextRequest) {
-    try {
+  const user = await currentUser();
+  const email = user?.primaryEmailAddress?.emailAddress;
+  if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { projectId, elements, appState, files, image } = await req.json();
-        const user = await currentUser();
-        const email = user?.primaryEmailAddress?.emailAddress || "guest@example.com";
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
 
-        if (!projectId) {
-            return NextResponse.json({ error: "ProjectId is required" }, { status: 400 });
-        }
+  const { projectId, elements, appState, files, image } = body ?? {};
+  if (typeof projectId !== 'string' || !projectId || !Array.isArray(elements) ||
+      !appState || typeof appState !== 'object' || Array.isArray(appState) ||
+      !files || typeof files !== 'object' || Array.isArray(files) ||
+      (image != null && typeof image !== 'string')) {
+    return NextResponse.json({ error: 'Invalid canvas data' }, { status: 400 });
+  }
 
-        // Ensure project exists in projects table to satisfy foreign key constraint
-        const existingProject = await db.select().from(projects).where(eq(projects.projectId, projectId));
-        if (!existingProject || existingProject.length === 0) {
-            await db.insert(projects).values({
-                projectId: projectId,
-                projectName: "Untitled Board",
-                userEmail: email
-            });
-        }
-        const result = await db.insert(whiteboardData).values({
-            projectId,
-            elements,
-            appState,
-            files,
-            image: image,
-        }).onConflictDoUpdate({
-            target: whiteboardData.projectId,
-            set: {
-                elements,
-                appState,
-                files,
-                image: image,
-                updatedAt: new Date()
-            }
-        });
+  try {
+    const [project] = await db.select().from(projects).where(and(eq(projects.projectId, projectId), eq(projects.userEmail, email)));
+    if (!project) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
+    if (project.archived) return NextResponse.json({ error: 'Restore this archived board before editing it.' }, { status: 403 });
 
-        return NextResponse.json(result);
-    } catch (error: any) {
-        console.error("Whiteboard save error:", error);
-        return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
-    }
-}       
+    const [saved] = await db.insert(whiteboardData).values({
+      projectId,
+      elements,
+      appState,
+      files,
+      image: image ?? null,
+      updatedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: whiteboardData.projectId,
+      set: { elements, appState, files, image: image ?? null, updatedAt: new Date() },
+    }).returning({ updatedAt: whiteboardData.updatedAt });
 
+    return NextResponse.json(saved);
+  } catch {
+    return NextResponse.json({ error: 'Unable to save your board. Please retry.' }, { status: 500 });
+  }
+}

@@ -6,11 +6,10 @@ import axios from 'axios';
 import { useParams } from 'next/navigation';
 import { toast } from '@/components/ui/toast';
 import { ArrowRight, Circle, Diamond, Eraser, Hand, HelpCircle, Image, Minus, MousePointer, Pencil, Sparkles, Square, Type, X } from 'lucide-react';
-import { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
+import { ExcalidrawImperativeAPI, ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types';
 import './whiteboard.css'
 import FloatingProperties from './FloatingProperties';
 import AIFloatingSidebar from './AIFloatingSidebar';
-import { Button } from '@/components/ui/button';
 import BottomToolbar from './BottomToolbar';
 import { generatePreviewBase64 } from '@/utils/helper';
 
@@ -73,14 +72,16 @@ const tools = [
 ]
 
 type Props = {
-    onApiReady: (api: ExcalidrawImperativeAPI) => void
+    onApiReady: (api: ExcalidrawImperativeAPI) => void;
+    initialData: ExcalidrawInitialDataState;
 }
 
-const Whiteboard = ({ onApiReady }: Props) => {
+const Whiteboard = ({ onApiReady, initialData }: Props) => {
 
     const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
-    const { projectId } = useParams();
+    const { projectId } = useParams<{ projectId: string }>();
     const saveTimeRef = useRef<NodeJS.Timeout | null>(null);
+    const pendingSceneRef = useRef<{ elements: readonly any[]; appState: any; files: any } | null>(null);
     const excalidrawAPIRef = useRef<ExcalidrawImperativeAPI | null>(null);
 
 
@@ -104,8 +105,17 @@ const Whiteboard = ({ onApiReady }: Props) => {
         onApiReadyRef.current?.(api);
       }
     },
-    [onApiReady],
+    [],
   );
+
+  useEffect(() => {
+    if (!excalidrawAPI) return;
+    const frame = window.requestAnimationFrame(() => {
+      excalidrawAPI.setActiveTool({ type: "selection" });
+      setActiveTool("selection");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [excalidrawAPI]);
 
   /** Resolve up to 1 representative element from the current selection.
    *  For grouped elements, returns a synthetic bounding-box element and
@@ -322,53 +332,42 @@ const Whiteboard = ({ onApiReady }: Props) => {
       return appState;
     });
 
-    // Cancel previous timer
-    if (saveTimeRef?.current) {
-      clearTimeout(saveTimeRef?.current);
-    }
+    pendingSceneRef.current = { elements, appState, files };
+    if (saveTimeRef.current) return;
 
-    // Debounce save by 2 seconds after user stops drawing/editing
     saveTimeRef.current = setTimeout(async () => {
+      saveTimeRef.current = null;
+      const pendingScene = pendingSceneRef.current;
+      pendingSceneRef.current = null;
+      if (!pendingScene) return;
+
       try {
-        await SaveCanvasChanges(elements, appState, files);
-      } catch (err) {
-        console.warn("Auto-save error caught:", err);
-      }
-    }, 2000);
+        await SaveCanvasChanges(pendingScene.elements, pendingScene.appState, pendingScene.files);
+      } catch {}
+    }, 20_000);
   };
 
-    const SaveCanvasChanges = async (
-    elements: readonly any[],
-    appState: any,
-    files: any,
-  ) => {
+  const SaveCanvasChanges = async (elements: readonly any[], appState: any, files: any) => {
     if (!projectId) return;
     try {
-        const api = excalidrawAPIRef.current;
+      const api = excalidrawAPIRef.current;
       const preview = api ? await generatePreviewBase64(api) : null;
-      const updatedAppState = {
-        ...appState,
-        ...(preview ? { image: preview } : {}),
-      };
-      const result = await axios.post("/api/whiteboard", {
-        elements: elements,
-        appState: updatedAppState,
-        files: files,
-        projectId: projectId,
+      await axios.post('/api/whiteboard', {
+        elements,
+        appState,
+        files,
+        projectId,
         image: preview,
       });
-
-      if (result.status === 200 && result.data) {
-        toast.add({ title: "Canvas Saved", type: "success" });
-      }
-    } catch (error: any) {
-      if (error?.response?.status === 401) {
-        console.warn("Canvas save unauthorized (401). User session may be unauthenticated.");
-      } else {
-        console.error("Failed to save whiteboard:", error);
-      }
+      toast.add({ title: 'Canvas auto-saved', type: 'success' });
+    } catch {
+      toast.add({ title: 'Auto-save failed', type: 'error' });
     }
   };
+
+  useEffect(() => () => {
+    if (saveTimeRef.current) clearTimeout(saveTimeRef.current);
+  }, []);
 
     useEffect(() => {
         const handleMouseUp = () => {
@@ -561,11 +560,10 @@ const Whiteboard = ({ onApiReady }: Props) => {
         const zoom = canvasState.zoom?.value ?? 1;
         const scrollX = canvasState.scrollX ?? 0;
         const scrollY = canvasState.scrollY ?? 0;
-        // center of selected element
+        // Keep the toolbar centered horizontally and just above the element.
         const centerX = selectedElement.x + selectedElement.width / 2;
-        // screen coordinates
         const screenX = (centerX + scrollX) * zoom;
-        const topY = selectedElement.y + selectedElement.height / 2;
+        const topY = selectedElement.y;
         const screenY = (topY + scrollY) * zoom;
 
         return {
@@ -789,8 +787,8 @@ const Whiteboard = ({ onApiReady }: Props) => {
     const floatingPosition = getFloatingPosition();
 
     return (
-        <div style={{ height: "90vh" }}>
-            <Excalidraw excalidrawAPI={handleExcalidrawRef} onChange={handleCanvasChange} />
+        <div className="relative h-[calc(100vh-65px)] min-h-[560px] overflow-hidden">
+            <Excalidraw initialData={initialData} excalidrawAPI={handleExcalidrawRef} onChange={handleCanvasChange} />
             <FloatingProperties
                 selectedElement={selectedElement}
                 position={floatingPosition}
@@ -801,7 +799,7 @@ const Whiteboard = ({ onApiReady }: Props) => {
                 onSendToBack={handleSendToBack}
                 onPropertyChange={handlePropertyChange}
             />
-            <div className="absolute left-4 top-4 z-50 flex flex-col gap-1 rounded-2xl bg-white border p-1.5 shadow-xl">
+            <div className="absolute left-5 top-5 z-50 flex flex-col gap-1 rounded-2xl border bg-white p-1.5 shadow-xl">
         {tools.map((tool) => {
           const Icon = tool.icon;
           return (

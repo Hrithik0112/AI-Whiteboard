@@ -90,7 +90,21 @@ function FloatingProperties({
     useEffect(() => {
         setDragOffset({ x: 0, y: 0 })
         setIsDragging(false)
+        setMoreOpen(false)
     }, [selectedElement?.id])
+
+    useEffect(() => {
+        if (!moreOpen) return
+
+        const closeWhenCanvasIsPressed = (event: PointerEvent) => {
+            const target = event.target as Element | null
+            if (target?.closest('[data-floating-properties], [data-slot="popover-content"]')) return
+            setMoreOpen(false)
+        }
+
+        document.addEventListener("pointerdown", closeWhenCanvasIsPressed, true)
+        return () => document.removeEventListener("pointerdown", closeWhenCanvasIsPressed, true)
+    }, [moreOpen])
 
 
     useEffect(() => {
@@ -164,7 +178,7 @@ function FloatingProperties({
         }
     }
 
-    const ElementIcon = () => {
+    const elementIcon = (() => {
         if (type === "rectangle") {
             return <Square size={18} />
         }
@@ -198,7 +212,7 @@ function FloatingProperties({
         }
 
         return <Layers size={18} />
-    }
+    })()
 
     const getMoreTitle = () => {
 
@@ -234,6 +248,7 @@ function FloatingProperties({
 
     return (
         <div
+            data-floating-properties
             className="
         absolute
         z-[500]
@@ -283,7 +298,7 @@ function FloatingProperties({
             <ToolbarDivider />
 
             <ToolbarButton title="Element" active>
-                <ElementIcon />
+                {elementIcon}
             </ToolbarButton>
 
             {/* Minimal clean toolbar for Emojis, Icons, Notes, and Images */}

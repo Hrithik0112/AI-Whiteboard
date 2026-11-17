@@ -40,9 +40,8 @@ function ArchivedProjectList() {
       if (Array.isArray(res.data)) {
         setProjectList(res.data);
       }
-    } catch (err) {
+    } catch {
       setError(true);
-      console.error("Failed to load archived projects:", err);
     } finally {
       setLoading(false);
     }
@@ -59,7 +58,6 @@ function ArchivedProjectList() {
       }
     } catch (err: any) {
       void refreshUserDetails?.();
-      console.error("Failed to restore project:", err);
       toast.add({ title: err?.response?.data?.error || "Failed to restore board", type: "error" });
     } finally {
       setRestoringId(null);
@@ -76,8 +74,7 @@ function ArchivedProjectList() {
         await refreshUserDetails?.();
         toast.add({ title: "Board permanently deleted", type: "success" });
       }
-    } catch (err) {
-      console.error("Failed to delete project permanently:", err);
+    } catch {
       toast.add({ title: "Failed to delete board", type: "error" });
     } finally {
       setDeleting(false);

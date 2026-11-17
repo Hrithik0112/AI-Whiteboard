@@ -499,9 +499,7 @@ export default function BottomToolbar({
       excalidrawAPI.updateScene({
         elements: [...existing, ...converted],
       });
-    } catch (err) {
-      console.error("Error adding note:", err);
-    }
+    } catch {}
   };
 
   const handleAddEmoji = async (emoji: string) => {
@@ -524,9 +522,7 @@ export default function BottomToolbar({
 
       const existing = excalidrawAPI.getSceneElements();
       excalidrawAPI.updateScene({ elements: [...existing, ...converted] });
-    } catch (err) {
-      console.error("Error adding emoji:", err);
-    }
+    } catch {}
   };
 
   const handleAddIcon = async (icon: {
@@ -572,9 +568,7 @@ export default function BottomToolbar({
 
       const existing = excalidrawAPI.getSceneElements();
       excalidrawAPI.updateScene({ elements: [...existing, ...converted] });
-    } catch (err) {
-      console.error("Error adding icon:", err);
-    }
+    } catch {}
   };
 
   return (

@@ -50,9 +50,8 @@ function ProjectList() {
       if (Array.isArray(res.data)) {
         setProjectList(res.data);
       }
-    } catch (err) {
+    } catch {
       setError(true);
-      console.error("Failed to load projects:", err);
     } finally {
       setLoading(false);
     }
@@ -68,8 +67,7 @@ function ProjectList() {
         await refreshUserDetails?.();
         toast.add({ title: "Board moved to archive", type: "success" });
       }
-    } catch (err) {
-      console.error("Failed to archive project:", err);
+    } catch {
       toast.add({ title: "Failed to archive board", type: "error" });
     } finally {
       setDeleting(false);

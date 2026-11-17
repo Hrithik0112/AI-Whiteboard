@@ -9,9 +9,29 @@ export const normalizeAppState = (appState: any) => {
     };
   }
 
+  // Do not restore interaction-only state from the previous session. In
+  // particular, restoring Hand/drawing mode makes selected elements appear
+  // immovable even though the custom toolbar shows Selection.
+  const persistentState = { ...appState };
+  for (const key of [
+    "activeTool",
+    "selectedElementIds",
+    "selectedGroupIds",
+    "editingElement",
+    "editingTextElement",
+    "draggingElement",
+    "resizingElement",
+    "selectionElement",
+    "contextMenu",
+  ]) {
+    delete persistentState[key];
+  }
+
   return {
-    ...appState,
+    ...persistentState,
     collaborators: new Map(),
+    selectedElementIds: {},
+    selectedGroupIds: {},
   };
 };
 
@@ -55,8 +75,7 @@ export const generatePreviewBase64 = async (api: any): Promise<string | null> =>
     });
 
     return await blobToBase64(blob);
-  } catch (error) {
-    console.error("Error generating preview:", error);
+  } catch {
     return null;
   }
 };
