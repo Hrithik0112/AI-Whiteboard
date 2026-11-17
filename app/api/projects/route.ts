@@ -32,100 +32,38 @@ export async function POST(req: NextRequest) {
         `);
         if (!result.rows.length) return NextResponse.json({ error: 'Insufficient Credits' }, { status: 409 });
         return NextResponse.json(result.rows[0]);
-    } catch (error) {
-        console.error('Failed to create board:', error);
+    } catch {
         return NextResponse.json({ error: 'Failed to create board' }, { status: 500 });
     }
 }
 
 export async function GET(req: NextRequest) {
-    const searchParams = req.nextUrl.searchParams;
-    const projectId = searchParams.get('projectId');
-    const isArchived = searchParams.get('archived') === 'true';
-
-    // If no projectId is provided, return all projects for the logged-in user
-    if (!projectId) {
-        try {
-            const user = await currentUser();
-            const email = user?.primaryEmailAddress?.emailAddress || "guest@example.com";
-
-            const userProjects = await db
-                .select({
-                    id: projects.id,
-                    projectId: projects.projectId,
-                    projectName: projects.projectName,
-                    userEmail: projects.userEmail,
-                    createdAt: projects.createdAt,
-                    archived: projects.archived,
-                    image: whiteboardData.image,
-                    appState: whiteboardData.appState,
-                    updatedAt: whiteboardData.updatedAt,
-                })
-                .from(projects)
-                .leftJoin(whiteboardData, eq(projects.projectId, whiteboardData.projectId))
-                .where(
-                    isArchived
-                        ? and(eq(projects.userEmail, email), eq(projects.archived, true))
-                        : and(eq(projects.userEmail, email), or(eq(projects.archived, false), isNull(projects.archived)))
-                )
-                .orderBy(desc(projects.createdAt));
-
-            const formatted = userProjects.map((p) => ({
-                id: p.id,
-                projectId: p.projectId,
-                projectName: p.projectName,
-                userEmail: p.userEmail,
-                createdAt: p.createdAt,
-                archived: p.archived,
-                updatedAt: p.updatedAt || p.createdAt,
-                image: p.image || (p.appState as any)?.image || null,
-            }));
-
-            return NextResponse.json(formatted);
-        } catch (err: any) {
-            console.error("GET /api/projects list error:", err);
-            return NextResponse.json({ error: "Failed to fetch projects" }, { status: 500 });
-        }
-    }
-
+    const user = await currentUser();
+    const email = user?.primaryEmailAddress?.emailAddress;
+    if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const projectId = req.nextUrl.searchParams.get('projectId');
+    const archived = req.nextUrl.searchParams.get('archived') === 'true';
     try {
-        const projectResult = await db.select().from(projects).where(eq(projects.projectId, projectId));
-        const project = projectResult?.[0];
-        const projectName = project?.projectName || "Untitled Board";
-
-        const result = await db.select().from(whiteboardData).where(eq(whiteboardData.projectId, projectId));
-
-        if (result && result.length > 0) {
-            return NextResponse.json({
-                ...result[0],
-                projectName: projectName,
-                archived: project?.archived || false,
-            });
+        if (!projectId) {
+            const rows = await db.select({
+                id: projects.id, projectId: projects.projectId, projectName: projects.projectName,
+                userEmail: projects.userEmail, createdAt: projects.createdAt, archived: projects.archived,
+                updatedAt: whiteboardData.updatedAt, image: whiteboardData.image,
+            }).from(projects).leftJoin(whiteboardData, eq(projects.projectId, whiteboardData.projectId))
+              .where(and(eq(projects.userEmail, email), archived ? eq(projects.archived, true) : or(eq(projects.archived, false), isNull(projects.archived))))
+              .orderBy(desc(projects.createdAt));
+            return NextResponse.json(rows.map(row => ({ ...row, updatedAt: row.updatedAt || row.createdAt })), { headers: { 'Cache-Control': 'no-store' } });
         }
-
-        // Default initial board object matching the structure in the tutorial
-        const defaultBoard = {
-            id: 1,
-            projectId: projectId,
-            projectName: projectName,
-            elements: [],
-            appState: { name: projectName, zoom: { value: 1 } },
-            files: {},
-            updatedAt: new Date().toISOString()
-        };
-
-        return NextResponse.json(defaultBoard);
-    } catch (err: any) {
-        console.error("GET /api/projects error:", err);
+        const [project] = await db.select().from(projects).where(and(eq(projects.projectId, projectId), eq(projects.userEmail, email)));
+        if (!project) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
+        const [canvas] = await db.select().from(whiteboardData).where(eq(whiteboardData.projectId, projectId));
         return NextResponse.json({
-            id: 1,
-            projectId: projectId,
-            projectName: "Untitled Board",
-            elements: [],
-            appState: { name: "Untitled Board", zoom: { value: 1 } },
-            files: {},
-            updatedAt: new Date().toISOString()
-        });
+            projectId, projectName: project.projectName, archived: !!project.archived,
+            elements: canvas?.elements ?? [], appState: canvas?.appState ?? {}, files: canvas?.files ?? {},
+            updatedAt: canvas?.updatedAt ?? project.createdAt,
+        }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch {
+        return NextResponse.json({ error: 'Unable to load your board. Please try again.' }, { status: 500 });
     }
 }
 
@@ -152,8 +90,7 @@ export async function DELETE(req: NextRequest) {
         // No credit increment: usage is counted from active boards. Repeated
         // archive calls and deleting archived boards cannot refund extra slots.
         return NextResponse.json({ success: true });
-    } catch (error) {
-        console.error('Failed to delete board:', error);
+    } catch {
         return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 });
     }
 }
@@ -178,8 +115,7 @@ export async function PATCH(req: NextRequest) {
         `);
         if (!result.rows.length) return NextResponse.json({ error: 'You already have 3 active boards. Archive a board before restoring this one.' }, { status: 409 });
         return NextResponse.json({ success: true });
-    } catch (error) {
-        console.error('Failed to restore board:', error);
+    } catch {
         return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
     }
 }

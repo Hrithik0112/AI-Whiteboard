@@ -15,8 +15,7 @@ export async function POST() {
     // Stored credits may have drifted in older versions. Active boards are the
     // source of truth; archived boards never consume a slot.
     return NextResponse.json({ ...record, ...await getBoardUsage(email) });
-  } catch (error) {
-    console.error('Failed to load user details:', error);
+  } catch {
     return NextResponse.json({ error: 'Failed to load user details' }, { status: 500 });
   }
 }

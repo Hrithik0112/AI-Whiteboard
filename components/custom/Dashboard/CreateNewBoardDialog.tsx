@@ -62,7 +62,6 @@ const CreateNewBoardDialog = ({ children }: CreateNewBoardDialogProps) => {
             }, 150)
         } catch (error: any) {
             void refreshUserDetails?.();
-            console.error(error);
             const msg = error?.response?.data?.error;
       if (msg === 'Insufficient Credits') {
         setDialogOpen(false);
