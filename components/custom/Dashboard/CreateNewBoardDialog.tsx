@@ -1,11 +1,12 @@
 "use client"
-import React, { useContext, useState } from 'react'
+import React, { useContext, useId, useState } from 'react'
 import {
     Dialog,
     DialogContent,
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
     DialogTrigger,
     DialogClose
 } from "@/components/ui/dialog"
@@ -23,13 +24,14 @@ interface CreateNewBoardDialogProps {
 
 const CreateNewBoardDialog = ({ children }: CreateNewBoardDialogProps) => {
 
+    const nameId = useId();
     const [workspaceName, setWorkspaceName] = useState('')
     const [loading, setLoading] = useState(false)
     const [dailogOpen, setDialogOpen] = useState(false)
 
     const router = useRouter()
 
-    const { userDetail, setUserDetail } = useContext(UserDetailsContext) || {}
+    const { refreshUserDetails } = useContext(UserDetailsContext) || {}
 
     const handleCreateBoard = async () => {
         if (workspaceName.trim() === "" || workspaceName.length > 30) {
@@ -40,28 +42,14 @@ const CreateNewBoardDialog = ({ children }: CreateNewBoardDialogProps) => {
             })
             return;
         }
-        if (userDetail?.credits !== undefined && userDetail.credits <= 0) {
-      toast.add({
-        type: "error",
-        title: "Credit Limit Reached",
-        description: "You have used all 3 free boards. Delete or archive an existing board to create a new one."
-      });
-      return;
-    }
         setLoading(true)
         try {
             const projectId = crypto.randomUUID()
-            const result = await axios.post('/api/projects', {
-                projectName: workspaceName,
+            await axios.post('/api/projects', {
+                projectName: workspaceName.trim(),
                 projectId: projectId
             })
-            console.log(result?.data);
-            if (setUserDetail && userDetail) {
-        setUserDetail({
-          ...userDetail,
-          credits: Math.max(0, (userDetail.credits ?? 3) - 1)
-        });
-      }
+            await refreshUserDetails?.();
             toast.add({
                 type: "success",
                 title: "New Workspace Created"
@@ -73,13 +61,16 @@ const CreateNewBoardDialog = ({ children }: CreateNewBoardDialogProps) => {
                 router.push('/workspace/' + projectId)
             }, 150)
         } catch (error: any) {
+            void refreshUserDetails?.();
             console.error(error);
             const msg = error?.response?.data?.error;
       if (msg === 'Insufficient Credits') {
+        setDialogOpen(false);
+        setWorkspaceName('');
         toast.add({
           type: "error",
-          title: "Insufficient Credits",
-          description: "You can only create up to 3 boards. Please delete a board to create a new one."
+          title: "Board limit reached",
+          description: "You already have 3 active boards. Archive a board to make room for a new one."
         });
       } else {
         toast.add({
@@ -97,40 +88,30 @@ const CreateNewBoardDialog = ({ children }: CreateNewBoardDialogProps) => {
             setDialogOpen(isOpen);
             if (!isOpen) setWorkspaceName('');
         }}>
-            <DialogTrigger className={children ? "w-auto" : "w-full"}
-                render={children ?? <Button className="w-full"><Plus />Create New Board</Button>}>
-                <Button className="w-full">
-                    <Plus />
-                    Create New Board
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Whiteboard Workspace Title</DialogTitle>
-
-                </DialogHeader>
-                <div>
-                    <label>
-                        Enter whiteboard workspace name
-                    </label>
-                    <Input placeholder='workspace name'
-                        onChange={(e) => setWorkspaceName(e.target.value)} />
-                </div>
-                <DialogFooter>
-                    <DialogClose>
-                        <Button variant="outline">
-                            Close
-                        </Button>
-                    </DialogClose>
-                    <Button onClick={handleCreateBoard} disabled={workspaceName.length === 0 || loading}>
-                        {loading && <Loader2 className="animate-spin" />}
-                        Create
-                    </Button>
-                </DialogFooter>
+            <DialogTrigger render={children ?? <button className="db-button"><Plus size={16} />New board</button>} />
+            <DialogContent className="db-dialog">
+                <form onSubmit={(event) => { event.preventDefault(); if (!loading) handleCreateBoard(); }} className="db-create-form">
+                    <DialogHeader>
+                        <DialogTitle>A fresh space for your ideas.</DialogTitle>
+                        <DialogDescription>Give your board a name. Make it your own.</DialogDescription>
+                    </DialogHeader>
+                    <div className="db-field">
+                        <label htmlFor={nameId}>Board name</label>
+                        <Input id={nameId} placeholder="e.g. My next big idea" value={workspaceName} maxLength={30} disabled={loading}
+                            onChange={(event) => setWorkspaceName(event.target.value)} autoFocus />
+                        <span>Up to 30 characters.</span>
+                    </div>
+                    <DialogFooter>
+                        <DialogClose render={<Button variant="outline" type="button" disabled={loading} />}>Cancel</DialogClose>
+                        <button className="db-button" type="submit" disabled={!workspaceName.trim() || loading}>
+                            {loading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                            {loading ? 'Creating…' : 'Create board'}
+                        </button>
+                    </DialogFooter>
+                </form>
             </DialogContent>
-
         </Dialog>
-    )
-}
+    );
+};
 
-export default CreateNewBoardDialog
+export default CreateNewBoardDialog;

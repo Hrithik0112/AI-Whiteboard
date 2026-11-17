@@ -1,18 +1,16 @@
-import AppHeader from '@/components/custom/Dashboard/AppHeader'
-import AppSidebar from '@/components/custom/Dashboard/AppSidebar'
-import { SidebarProvider } from '@/components/ui/sidebar'
-import React from 'react'
+import AppHeader from '@/components/custom/Dashboard/AppHeader';
+import AppSidebar from '@/components/custom/Dashboard/AppSidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import '@/components/custom/Dashboard/dashboard.css';
 
-const Dashboardlayout = ({children } : {children : React.ReactNode}) => {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarProvider>
-        <AppSidebar/>
-        <div className='flex flex-1 flex-col'>
-            <AppHeader/>
-            {children}
-        </div>
+    <SidebarProvider className="dashboard-shell" style={{ '--sidebar-width': '18rem', '--sidebar-width-icon': '4.5rem' } as React.CSSProperties}>
+      <AppSidebar />
+      <div className="dashboard-main">
+        <AppHeader />
+        <main id="dashboard-content" className="dashboard-content">{children}</main>
+      </div>
     </SidebarProvider>
-  )
+  );
 }
-
-export default Dashboardlayout

@@ -1,39 +1,59 @@
-"use client"
-import React, { useEffect, useState } from 'react'
+'use client';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { UserDetailsContext } from '@/context/UserDetailsContext';
+import { UserDetailsContext, type UserDetails } from '@/context/UserDetailsContext';
 import { useUser } from '@clerk/nextjs';
+import { AppearanceProvider } from '@/context/AppearanceContext';
+import { usePathname } from 'next/navigation';
 
-const Provider = ({children} : {children : React.ReactNode}) => {
+export default function Provider({ children }: { children: React.ReactNode }) {
+  const [userDetail, setUserDetail] = useState<UserDetails | null>(null);
+  const [userDetailsError, setUserDetailsError] = useState(false);
+  const { user, isLoaded } = useUser();
+  const pathname = usePathname();
+  const requestVersion = useRef(0);
+  const userId = user?.id;
 
-    const [userDeatials, setuserDeatials] = useState(null)
-
-    const { user, isLoaded } = useUser();
-
-    const CreateNewUser = async () => {
-      try {
-        const payload = user ? {
-          name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.username || "User",
-          email: user.primaryEmailAddress?.emailAddress
-        } : {};
-        const result = await axios.post("/api/users", payload);
-        console.log(result.data);
-        setuserDeatials(result.data);
-      } catch (err: any) {
-        console.error("Error creating/fetching user:", err);
+  const refreshUserDetails = useCallback(async () => {
+    const version = ++requestVersion.current;
+    if (!isLoaded || !userId) {
+      setUserDetail(null);
+      setUserDetailsError(false);
+      return;
+    }
+    try {
+      const { data } = await axios.post<UserDetails>('/api/users');
+      if (version === requestVersion.current) {
+        setUserDetail(data);
+        setUserDetailsError(false);
       }
+    } catch {
+      if (version === requestVersion.current) {
+        setUserDetail(null);
+        setUserDetailsError(true);
+      }
+    }
+  }, [isLoaded, userId]);
+
+  useEffect(() => {
+    setUserDetail(null);
+    return () => { requestVersion.current++; };
+  }, [userId]);
+
+  useEffect(() => {
+    void refreshUserDetails();
+    // Revalidate after navigation and when returning from another tab.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshUserDetails();
     };
+    window.addEventListener('focus', refreshUserDetails);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      requestVersion.current++;
+      window.removeEventListener('focus', refreshUserDetails);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [pathname, refreshUserDetails]);
 
-    useEffect(()=>{
-        if (isLoaded) {
-          CreateNewUser();
-        }
-    }, [isLoaded, user])
-  return (
-    <UserDetailsContext.Provider value={{userDeatials, setuserDeatials}}>
-        <div>{children}</div>
-    </UserDetailsContext.Provider>
-  )
+  return <UserDetailsContext.Provider value={{ userDetail, setUserDetail, refreshUserDetails, userDetailsError }}><AppearanceProvider key={userId || 'guest'} accountId={userId}>{children}</AppearanceProvider></UserDetailsContext.Provider>;
 }
-
-export default Provider;

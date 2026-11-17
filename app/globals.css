@@ -5,6 +5,12 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Readable small text across shared controls, menus, and workspace panels. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.5rem;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
@@ -33,12 +39,6 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Custom Whizboard colors */
-  --color-purple: var(--purple);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-info: var(--info);
-
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -66,8 +66,8 @@
     }
   }
 
-  --font-heading: var(--font-sans);
-  --font-sans: var(--font-sans);
+  --font-heading: var(--app-font);
+  --font-sans: var(--app-font);
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -107,7 +107,7 @@
   --popover: #ffffff;
   --popover-foreground: #111827;
 
-  /* Primary Whizboard Blue */
+  /* Primary */
   --primary: #2f6bff;
   --primary-foreground: #ffffff;
 
@@ -126,12 +126,6 @@
   /* Destructive */
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-
-  /* Custom colors */
-  --purple: #8b5cf6;
-  --success: #34a853;
-  --warning: #f59e0b;
-  --info: #2f6bff;
 
   /* Borders */
   --border: #e8eaf0;
@@ -192,11 +186,6 @@
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
-  --purple: #a78bfa;
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --info: #60a5fa;
-
   --border: #263044;
   --input: #263044;
   --ring: #5b83ff;
@@ -238,74 +227,77 @@
   }
 }
 
-/* =========================
-   WHIZBOARD UTILITIES
-   ========================= */
-
-@layer utilities {
-  /* Main button */
-  .bg-brand-gradient {
-    background: linear-gradient(
-      90deg,
-      #2f6bff 0%,
-      #8b5cf6 100%
-    );
-  }
-
-  /* Main button hover */
-  .bg-brand-gradient-hover {
-    background: linear-gradient(
-      90deg,
-      #2457e6 0%,
-      #7c3aed 100%
-    );
-  }
-
-  /* Dashboard hero */
-  .bg-hero-gradient {
-    background: linear-gradient(
-      110deg,
-      #eef5ff 0%,
-      #f5f7ff 45%,
-      #f8f0ff 100%
-    );
-  }
-
-  /* AI cards */
-  .bg-ai-soft {
-    background: #f3efff;
-  }
-
-  /* Green cards */
-  .bg-success-soft {
-    background: #eaf8ec;
-  }
-
-  /* Orange cards */
-  .bg-warning-soft {
-    background: #fff4df;
-  }
-
-  /* Blue cards */
-  .bg-info-soft {
-    background: #eef4ff;
-  }
-
-  /* Light pink */
-  .bg-pink-soft {
-    background: #feeff6;
-  }
-
-  /* Card shadow */
-  .shadow-whizboard {
-    box-shadow:
-      0 1px 2px rgb(16 24 40 / 0.03),
-      0 4px 12px rgb(16 24 40 / 0.05);
-  }
-
-  .shadow-whizboard-hover {
-    box-shadow:
-      0 4px 8px rgb(16 24 40 / 0.05),
-      0 12px 28px rgb(16 24 40 / 0.08);
-  }
+/* Interface preferences. Palette variables also reach portaled menus/dialogs. */
+:root {
+  --app-font: var(--font-inter), Arial, sans-serif;
+  --app-bg: #fbfbf8;
+  --app-surface: #ffffff;
+  --app-sidebar: #f4f5ee;
+  --app-soft: #f0f3e9;
+  --app-selected: #e7ebdd;
+  --app-border: #dfe4d5;
+  --app-text: #292c25;
+  --app-muted: #737e67;
+  --app-heading: #45543a;
+  --app-accent: #566b45;
+  --app-accent-hover: #415333;
+  --app-on-accent: #ffffff;
+  --app-focus: #879770;
+  --app-dots: #dce1d2;
+  --background: var(--app-bg);
+  --foreground: var(--app-text);
+  --card: var(--app-surface);
+  --card-foreground: var(--app-text);
+  --popover: var(--app-surface);
+  --popover-foreground: var(--app-text);
+  --primary: var(--app-accent);
+  --primary-foreground: var(--app-on-accent);
+  --secondary: var(--app-soft);
+  --secondary-foreground: var(--app-text);
+  --muted: var(--app-soft);
+  --muted-foreground: var(--app-muted);
+  --accent: var(--app-selected);
+  --accent-foreground: var(--app-heading);
+  --border: var(--app-border);
+  --input: var(--app-border);
+  --ring: var(--app-focus);
+  --sidebar: var(--app-sidebar);
+  --sidebar-foreground: var(--app-text);
+  --sidebar-primary: var(--app-accent);
+  --sidebar-primary-foreground: var(--app-on-accent);
+  --sidebar-accent: var(--app-selected);
+  --sidebar-accent-foreground: var(--app-heading);
+  --sidebar-border: var(--app-border);
+  --sidebar-ring: var(--app-focus);
 }
+:root[data-color-scheme="slate"] {
+  --app-bg: #f9fafc;
+  --app-sidebar: #f1f4f8;
+  --app-soft: #edf1f7;
+  --app-selected: #e1e8f2;
+  --app-border: #d9e1ec;
+  --app-text: #273241;
+  --app-muted: #68798e;
+  --app-heading: #3a506b;
+  --app-accent: #456389;
+  --app-accent-hover: #344d6e;
+  --app-focus: #7a94b4;
+  --app-dots: #d8e0eb;
+}
+:root[data-color-scheme="sand"] {
+  --app-bg: #fcfaf7;
+  --app-sidebar: #f7f2eb;
+  --app-soft: #f4eee5;
+  --app-selected: #ede2d2;
+  --app-border: #e5daca;
+  --app-text: #393027;
+  --app-muted: #877461;
+  --app-heading: #6c513b;
+  --app-accent: #896445;
+  --app-accent-hover: #6f4e33;
+  --app-focus: #af8c6b;
+  --app-dots: #e6ddcf;
+}
+:root[data-font="arial"] { --app-font: Arial, Helvetica, sans-serif; }
+:root[data-font="georgia"] { --app-font: Georgia, "Times New Roman", serif; }
+body { font-family: var(--app-font); }

@@ -1,12 +1,9 @@
 "use client";
-import { Button } from "@/components/ui/button";
-import Image from "next/image";
-import Link from "next/link";
 import React, { useEffect, useState, useContext } from "react";
 import axios from "axios";
+import BoardCard from "./BoardCard";
 import CreateNewBoardDialog from "./CreateNewBoardDialog";
-import { Layout, Loader2, Plus, Trash2 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Archive, Layout, Loader2, Search } from "lucide-react";
 import { toast } from "@/components/ui/toast";
 
 import {
@@ -32,11 +29,14 @@ export interface ProjectItem {
 }
 
 function ProjectList() {
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState("recent");
+  const [error, setError] = useState(false);
   const [projectList, setProjectList] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const { userDetail, setUserDetail } = useContext(UserDetailsContext) || {};
+  const { refreshUserDetails } = useContext(UserDetailsContext) || {};
 
   useEffect(() => {
     fetchProjects();
@@ -45,23 +45,16 @@ function ProjectList() {
   const fetchProjects = async () => {
     try {
       setLoading(true);
+      setError(false);
       const res = await axios.get("/api/projects");
       if (Array.isArray(res.data)) {
         setProjectList(res.data);
       }
     } catch (err) {
+      setError(true);
       console.error("Failed to load projects:", err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getTimeAgo = (dateStr?: string) => {
-    if (!dateStr) return "Just now";
-    try {
-      return formatDistanceToNow(new Date(dateStr), { addSuffix: true });
-    } catch {
-      return "recently";
     }
   };
 
@@ -72,12 +65,7 @@ function ProjectList() {
       const res = await axios.delete(`/api/projects?projectId=${deleteProjectId}`);
       if (res.status === 200) {
         setProjectList((prev) => prev.filter((p) => p.projectId !== deleteProjectId));
-        if (setUserDetail && userDetail) {
-          setUserDetail({
-            ...userDetail,
-            credits: Math.min(3, (userDetail.credits ?? 0) + 1)
-          });
-        }
+        await refreshUserDetails?.();
         toast.add({ title: "Board moved to archive", type: "success" });
       }
     } catch (err) {
@@ -89,121 +77,25 @@ function ProjectList() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="mt-10 flex flex-col items-center justify-center py-20 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Loading your boards...</p>
-      </div>
-    );
-  }
+  const visibleProjects = projectList.filter(project => project.projectName.toLowerCase().includes(query.trim().toLowerCase())).sort((a, b) => sort === 'name' ? a.projectName.localeCompare(b.projectName) : new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
 
   return (
-    <div className="mt-8">
-      {projectList.length === 0 ? (
-        // Empty state
-        <div className="flex flex-col items-center p-12 border rounded-2xl mt-6 gap-3 bg-muted/20 border-dashed">
-          <Image src="/folder.png" alt="Folder" width={90} height={90} />
-          <h2 className="text-2xl font-bold">No Board Found</h2>
-          <p className="text-muted-foreground text-center max-w-sm">
-            Create your first board to start brainstorming, sketching, and planning!
-          </p>
-          <CreateNewBoardDialog>
-            <Button className="w-auto mt-2">+ Create New Board</Button>
-          </CreateNewBoardDialog>
+    <section className="db-boards" aria-label="Your boards">
+      <div className="db-list-toolbar">
+        <h2>All boards <span>{loading ? '—' : projectList.length}</span></h2>
+        <div className="db-list-controls">
+          <label className="db-search"><Search size={15} /><input aria-label="Search boards" placeholder="Search boards…" value={query} onChange={event => setQuery(event.target.value)} /></label>
+          <select className="db-sort" aria-label="Sort boards" value={sort} onChange={event => setSort(event.target.value)}><option value="recent">Recently edited</option><option value="name">Name A–Z</option></select>
         </div>
-      ) : (
-        <div>
-          {/* Header matching tutorial: "Your Boards" */}
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Your Boards
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Create, organize and continue working on your ideas
-              </p>
-            </div>
-            <CreateNewBoardDialog>
-              <Button size="sm" className="flex items-center gap-1.5">
-                <Plus className="w-4 h-4" /> New Board
-              </Button>
-            </CreateNewBoardDialog>
-          </div>
-
-          {/* Project List Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {projectList.map((project) => (
-              <div
-                key={project.projectId}
-                className="group relative flex flex-col rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-card overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300"
-              >
-                {/* Clickable Card Link to Workspace */}
-                <Link
-                  href={"/workspace/" + project.projectId}
-                  className="flex-1 flex flex-col"
-                >
-                  {/* Thumbnail Preview */}
-                  <div className="h-44 w-full bg-white dark:bg-slate-900 flex items-center justify-center overflow-hidden border-b border-gray-100 dark:border-gray-800 p-2">
-                    {project.image ? (
-                      <img
-                        src={project.image}
-                        alt={project.projectName}
-                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center gap-2 text-gray-400">
-                        <div className="p-3 rounded-full bg-slate-50 dark:bg-slate-800">
-                          <Layout className="w-6 h-6 text-gray-400" />
-                        </div>
-                        <span className="text-xs font-medium text-gray-400">Empty Canvas</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Title and Edited Time */}
-                  <div className="px-4 pt-3.5 pb-2">
-                    <h3
-                      className="font-bold text-base text-gray-900 dark:text-white truncate group-hover:text-primary transition-colors"
-                      title={project.projectName}
-                    >
-                      {project.projectName}
-                    </h3>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Edited {getTimeAgo(project.updatedAt || project.createdAt)}
-                    </p>
-                  </div>
-                </Link>
-
-                {/* Bottom Footer Row: "Whiteboard" tag & Delete Button */}
-                <div className="px-4 pb-3 pt-2 flex items-center justify-between border-t border-gray-100 dark:border-gray-800/60 mt-auto">
-                  <span className="text-xs font-medium text-gray-400">
-                    Whiteboard
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setDeleteProjectId(project.projectId);
-                    }}
-                    title="Delete board"
-                    className="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/60 hover:text-red-600 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      </div>
+      {loading ? <div className="db-empty" role="status"><Loader2 size={23} className="animate-spin" /><p>Loading your boards…</p></div> : error ? <div className="db-empty" role="alert"><h3>Couldn’t load your boards.</h3><p>Please try again in a moment.</p><button className="db-button" onClick={fetchProjects}>Try again</button></div> : projectList.length === 0 ? <div className="db-empty"><div className="db-empty-icon"><Layout size={28} strokeWidth={1.2} /></div><h3>Your next idea starts here.</h3><p>Create a board to sketch, connect, and see things clearly.</p><CreateNewBoardDialog /></div> : visibleProjects.length === 0 ? <div className="db-empty"><Search size={23} /><h3>No matching boards.</h3><p>Try another name or clear your search.</p><button className="db-secondary-button" onClick={() => setQuery('')}>Clear search</button></div> : <div className="db-board-grid">{visibleProjects.map(project => <BoardCard key={project.projectId} project={project}><button className="db-icon-button" onClick={() => setDeleteProjectId(project.projectId)} aria-label={`Archive ${project.projectName}`} title="Archive board"><Archive size={15} /></button></BoardCard>)}</div>}
 
       {/* Move to Archive Confirmation Alert Dialog */}
       <AlertDialog
         open={!!deleteProjectId}
         onOpenChange={(open) => !open && setDeleteProjectId(null)}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="db-dialog">
           <AlertDialogHeader>
             <AlertDialogTitle>Move to Archive</AlertDialogTitle>
             <AlertDialogDescription>
@@ -215,14 +107,14 @@ function ProjectList() {
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleting}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="db-button"
             >
               {deleting ? "Archiving..." : "Move to Archive"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </section>
   );
 }
 
